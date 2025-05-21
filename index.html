@@ -1,0 +1,290 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>カップディスペンサ 通信仕様</title>
+  <style>
+    body {
+      font-family: 'Arial', sans-serif;
+      line-height: 1.6;
+      margin: 0;
+      padding: 2rem;
+      background-color: #f4f4f4;
+    }
+    h1, h2 {
+      color: #333;
+    }
+    h1 {
+      border-bottom: 2px solid #888;
+      padding-bottom: 0.5rem;
+    }
+    .step {
+      background: white;
+      border-left: 5px solid #007ACC;
+      padding: 1rem;
+      margin-bottom: 1rem;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 1rem;
+    }
+    th, td {
+      border: 1px solid #ccc;
+      padding: 0.5rem;
+      text-align: left;
+    }
+    th {
+      background-color: #f0f0f0;
+    }
+    .highlight {
+      background-color: #c8c8c8;
+      padding: 0 0.3em;
+      border-radius: 4px;
+    }
+    code {
+      background-color: #eee;
+      padding: 0.2em 0.4em;
+      border-radius: 4px;
+      display: block;
+      white-space: pre-wrap;
+    }
+  </style>
+</head>
+<body>
+  <h1>✅ カップディスペンサ通信仕様</h1>
+  <div class="step">
+    <nav>
+      <h2>📚 目次</h2>
+      <ul>
+        <li><a href="#sec1">I. 通信方式</a></li>
+        <li><a href="#sec2">II. 命令コード</a></li>
+        <li><a href="#sec3">III. 長さコード</a></li>
+        <li><a href="#sec4">IV. チェックサムコード</a></li>
+        <li><a href="#sec5">V. エンドコード</a></li>
+        <li><a href="#sec6">VI. コマンドコード</a></li>
+        <ul>
+          <li><a href="#cmd01">0x01 スレーブ状態の問い合わせ</a></li>
+          <li><a href="#cmd02">0x02 スレーブパラメータ</a></li>
+          <li><a href="#cmd03">0x03 シャットダウン</a></li>
+          <li><a href="#cmd04">0x04 飲料の提供</a></li>
+          <li><a href="#cmd05">0x05 Ruying専用</a></li>
+        </ul>
+        <li><a href="#sec7">ChatGPT</a></li>
+      </ul>
+    </nav>
+  </div>
+  <div class="step">
+    <h2 id="sec1">I. 通信方式</h2>
+    <p><strong>シリアルポート（UART）通信</strong></p>
+    <ul>
+      <li>ハードウェア物理ポート：RS232 または RS485</li>
+      <li>通信パラメータ：</li>
+      <ul>
+        <li>スタートビット：1</li>
+        <li>データビット：8</li>
+        <li>ストップビット：1</li>
+        <li>パリティビットなし</li>
+        <li>ボーレート：115200</li>
+      </ul>
+    </ul>
+
+    <h3>データフレーム構成（データ文字列フォーマット）</h3>
+    <code>
+「コマンドコード」+「長さコード」+「命令コード」+「データ1」...「データn」+「チェックサムコード」+「エンドコード」
+    </code>
+
+    <table>
+      <thead>
+        <tr><th>フィールド</th><th>内容</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>コマンドコード</td><td>命令種別を示す</td></tr>
+        <tr><td>長さコード</td><td>データ長</td></tr>
+        <tr><td>命令コード</td><td>読み取り/書き込み区別</td></tr>
+        <tr><td>チェックサムコード</td><td>データ整合性検証用</td></tr>
+        <tr><td>エンドコード</td><td>通信終了マーク（0xFF）</td></tr>
+      </tbody>
+    </table>
+
+    <p><strong>通信方式：</strong><br>マスタースレーブ方式（ホストがマスター、カップディスペンサがスレーブ）</p>
+    <ul>
+      <li>ホストが命令を送信 → スレーブが応答</li>
+    </ul>
+
+    <h3>セッションフロー</h3>
+    <code>
+【ホスト】
+ステップ1：スレーブへ問い合わせ/設定命令を送信  
+ステップ2：スレーブの応答を受信
+
+【スレーブ】
+ステップ1：ホストからの命令を受信  
+ステップ2：命令に応じて応答を送信
+    </code>
+
+    <p class="highlight">🔔 注意：ホストが命令を送信後、1秒以内に応答がなければ再送。最大3回再送しても応答がなければ、通信エラーとみなす。</p>
+  </div>
+
+  <div class="step">
+    <h2 id="sec2">II. 命令コード（Instruction Code）</h2>
+    <ul>
+      <li>0x55：スレーブのデータを読み取る（Query）</li>
+      <li>0xAA：スレーブにデータを設定する（Set）</li>
+    </ul>
+    <p>※具体的なデータ種別は「コマンドコード（Command Code）」で指定。</p>
+  </div>
+
+  <div class="step">
+    <h2 id="sec3">III. 長さコード（Length Code）</h2>
+    <p>長さコードは、データフレーム内すべての 8ビットバイトの合計数。</p>
+
+    <p><strong>例1：</strong></p>
+    <code>「コマンドコード」+「長さコード」+「命令コード」+「データ1」+「チェックサムコード」+「エンドコード」</code>
+    <p>→ 長さコード = 6</p>
+
+    <p><strong>例2：</strong></p>
+    <code>「コマンドコード」+「長さコード」+「命令コード」+「データ1」+「データ2」+「チェックサムコード」+「エンドコード」</code>
+    <p>→ 長さコード = 7</p>
+  </div>
+
+  <div class="step">
+    <h2 id="sec4">IV. チェックサムコード（Checksum Code）</h2>
+    <p>チェックサムコードは、「チェックサムコード」と「エンドコード」以外のすべての値の合計の下位8ビット（合計値 &amp; 0xFF）を使用。</p>
+  </div>
+
+  <div class="step">
+    <h2 id="sec5">V. エンドコード</h2>
+    <p>エンドコードは固定の16進値「0xFF」です。</p>
+    <p>エンドコードの判定では、「0xFF」を受信した際に「Length Code（長さコード）」を確認します。受信バイト数が「Length Code」の値と一致する場合、受信は完了と見なされます。</p>
+  </div>
+
+  <div class="step">
+    <h2 id="sec6">VI. コマンドコード</h2>
+    <table>
+      <thead>
+        <tr><th>コマンド内容</th><th>コマンドコード</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>スレーブ状態の問い合わせ</td><td>0x01</td></tr>
+        <tr><td>スレーブパラメータの読み取り・設定</td><td>0x02</td></tr>
+        <tr><td>シャットダウン（※未実装）</td><td>0x03</td></tr>
+        <tr><td>飲料の提供（カップの排出）</td><td>0x04</td></tr>
+        <tr><td>Ruying専用コマンド（定期報告）</td><td>0x05</td></tr>
+      </tbody>
+    </table>
+
+    <h3 id="cmd01">スレーブ状態の問い合わせ（0x01）</h3>
+    <p><strong>ホスト → スレーブ：</strong></p>
+    <code>0x01 長さコード 0x55 チェックサムコード エンドコード</code>
+
+    <p><strong>スレーブ → ホスト：</strong></p>
+    <code>0x01 長さコード 0x55 データ1 データ2 チェックサムコード エンドコード</code>
+
+    <table>
+      <thead><tr><th>データ内容</th><th>ビットまたは値</th></tr></thead>
+      <tbody>
+        <tr><td>データ1（各ビットの状態）</td><td>
+          Bit0: 1 = カップなし, 0 = 正常<br>
+          Bit1: 1 = カップが取り出されていない, 0 = 正常<br>
+          Bit2: 1 = 機能用引き出しが開いている, 0 = 正常<br>
+          Bit3: 1 = モーター異常, 0 = 正常<br>
+          Bit4: 1 = ロボットアーム所定位置, 0 = 正常
+        </td></tr>
+        <tr><td>データ2（システム稼働状態）</td><td>
+          0 = 待機状態（APPから排出指令可）<br>
+          1 = 排出中<br>
+          2 = エラー
+        </td></tr>
+      </tbody>
+    </table>
+        <h3 id="cmd02">スレーブパラメータの読み取り・設定（0x02）</h3>
+
+    <h4>■ 読み取り</h4>
+    <p><strong>ホスト → スレーブ：</strong></p>
+    <code>0x02 長さコード 0x55 チェックサムコード エンドコード</code>
+
+    <p><strong>スレーブ → ホスト：</strong></p>
+    <code>0x02 長さコード 0x55 データ1～データ13 チェックサムコード エンドコード</code>
+
+    <p>データ例：</p>
+    <ul>
+      <li>データ7: アラーム音設定（1 = オン、0 またはその他 = オフ）</li>
+      <li>データ11～13: バージョン番号</li>
+    </ul>
+
+    <h4>■ 設定</h4>
+    <p><strong>ホスト → スレーブ：</strong></p>
+    <code>0x02 長さコード 0xAA データ1～10 チェックサムコード エンドコード</code>
+
+    <p><strong>スレーブ → ホスト：</strong></p>
+    <code>0x02 長さコード 0xAA データ1 チェックサムコード エンドコード</code>
+
+    <p>データ1:</p>
+    <ul>
+      <li>0x00 = 設定失敗</li>
+      <li>0x01 = 設定成功</li>
+    </ul>
+    <p class="highlight">※スレーブがエラー状態でないときにのみ設定可能</p>
+
+    <h3 id="cmd03">シャットダウン（0x03）</h3>
+    <p>ホストがスレーブにシャットダウン命令を送信します（※スレーブが異常状態でない場合にのみ実行可能）。</p>
+
+    <p><strong>ホスト → スレーブ：</strong></p>
+    <code>0x03 長さコード 0xAA チェックサムコード エンドコード</code>
+
+    <p><strong>スレーブ → ホスト：</strong></p>
+    <code>0x03 長さコード 0xAA データ1 チェックサムコード エンドコード</code>
+
+    <p>データ1 の意味：</p>
+    <ul>
+      <li>0x00 = シャットダウン失敗</li>
+      <li>0x01 = シャットダウン成功</li>
+    </ul>
+
+    <h3 id="cmd04">飲料の提供（0x04）</h3>
+    <p>ホストがスレーブに「カップを1個排出する」命令を送信します。</p>
+
+    <p><strong>ホスト → スレーブ：</strong></p>
+    <code>0x04 長さコード 0xAA 飲料番号 データ1 チェックサムコード エンドコード</code>
+
+    <p>飲料番号（Beverage Number）</p>
+    <ul>
+      <li>値: 1（カップを1個排出）</li>
+    </ul>
+    <p>データ1: 予約（Reserved、未使用）</p>
+
+    <p><strong>スレーブ → ホスト：</strong></p>
+    <code>0x04 長さコード 0xAA 飲料番号 データ1 チェックサムコード エンドコード</code>
+
+    <p>データ1 の意味：</p>
+    <ul>
+      <li>0x00 = 排出失敗</li>
+      <li>0x01 = 排出成功</li>
+    </ul>
+
+    <p><strong>🔹 例：</strong></p>
+    <code>04 07 AA 01 00 B6 FF</code>
+    <p>これは「カップ1個を排出する」命令の実例です。</p>
+
+    <h3 id="cmd05">Ruying 専用（0x05）</h3>
+    <p>このコマンドはスレーブからホストへ定期的（300ms間隔）に自動送信されます。</p>
+
+    <p><strong>スレーブ → ホスト：</strong></p>
+    <code>0x05 長さコード 0xAA データ1 チェックサムコード エンドコード</code>
+
+    <p>データ1 の意味：</p>
+    <ul>
+      <li>0x01 = カップが取り出されていない</li>
+      <li>0x00 またはその他 = 意味なし（無視可）</li>
+    </ul>
+  </div>
+  <div class="step">
+    <h2 id="sec7">ChatGPT</h2>
+    <p><a href="https://chatgpt.com/share/682d370b-7bf8-8009-b100-65609aa8f2d7">ChatGPTの質問URL-コードの作成などに使ってください。</a></p>
+  </div>
+</body>
+</html>
+<!-- https://chatgpt.com/share/682d370b-7bf8-8009-b100-65609aa8f2d7 -->
